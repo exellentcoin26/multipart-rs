@@ -1,9 +1,12 @@
 #![no_main]
 
+#[macro_use]
+extern crate libfuzzer_sys;
+
 use std::io::BufRead;
 
 use multipart::mock::ServerRequest;
-use multipart::server::{Multipart, MultipartData};
+use multipart::server::Multipart;
 
 use log::info;
 
@@ -11,8 +14,7 @@ mod logger;
 
 const BOUNDARY: &'static str = "--12--34--56";
 
-#[export_name = "rust_fuzzer_test_input"]
-pub extern "C" fn go(data: &[u8]) {
+fuzz_target!(|data: &[u8]| {
     logger::init();
 
     info!("Fuzzing started! Data len: {}", data.len());
@@ -20,7 +22,7 @@ pub extern "C" fn go(data: &[u8]) {
     do_fuzz(data);
 
     info!("Finished fuzzing iteration");
-}
+});
 
 fn do_fuzz(data: &[u8]) {
     if data.len() < BOUNDARY.len() {
