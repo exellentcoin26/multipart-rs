@@ -8,39 +8,10 @@
 use std::io::{self, Read, Write};
 use std::fmt;
 
+use log::debug;
+
 use rand::{self, Rng};
 use rand::prelude::ThreadRng;
-
-/// A mock implementation of `client::HttpRequest` which can spawn an `HttpBuffer`.
-///
-/// `client::HttpRequest` impl requires the `client` feature.
-#[derive(Default, Debug)]
-pub struct ClientRequest {
-    boundary: Option<String>,
-    content_len: Option<u64>,
-}
-
-#[cfg(feature = "client")]
-impl ::client::HttpRequest for ClientRequest {
-    type Stream = HttpBuffer;
-    type Error = io::Error;
-
-    fn apply_headers(&mut self, boundary: &str, content_len: Option<u64>) -> bool {
-        self.boundary = Some(boundary.into());
-        self.content_len = content_len;
-        true
-    }
-
-    /// ## Panics
-    /// If `apply_headers()` was not called.
-    fn open_stream(self) -> Result<HttpBuffer, io::Error> {
-        debug!("ClientRequest::open_stream called! {:?}", self);
-        let boundary = self.boundary.expect("ClientRequest::set_headers() was not called!");
-
-        Ok(HttpBuffer::new_empty(boundary, self.content_len))
-    }
-}
-
 
 /// A writable buffer which stores the boundary and content-length, if provided.
 ///
@@ -102,16 +73,6 @@ impl Write for HttpBuffer {
     }
 }
 
-#[cfg(feature = "client")]
-impl ::client::HttpStream for HttpBuffer {
-    type Request = ClientRequest;
-    type Response = HttpBuffer;
-    type Error = io::Error;
-
-    /// Returns `Ok(self)`.
-    fn finish(self) -> Result<Self, io::Error> { Ok(self) }
-}
-
 impl fmt::Debug for HttpBuffer {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("multipart::mock::HttpBuffer")
@@ -165,7 +126,7 @@ impl<'a> Read for ServerRequest<'a> {
 }
 
 #[cfg(feature = "server")]
-impl<'a> ::server::HttpRequest for ServerRequest<'a> {
+impl<'a> crate::server::HttpRequest for ServerRequest<'a> {
     type Body = Self;
 
     fn multipart_boundary(&self) -> Option<&str> { Some(self.boundary) }

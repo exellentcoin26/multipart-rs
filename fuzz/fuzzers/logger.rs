@@ -1,28 +1,23 @@
-extern crate log;
+use log::{LevelFilter, Log, Metadata, Record};
 
-use self::log::{LogLevelFilter, Log, LogMetadata, LogRecord};
-
-const MAX_LOG_LEVEL: LogLevelFilter = LogLevelFilter::Off;
+const MAX_LOG_LEVEL: LevelFilter = LevelFilter::Off;
 
 struct Logger;
 
 impl Log for Logger {
-    fn enabled(&self, metadata: &LogMetadata) -> bool {
+    fn enabled(&self, metadata: &Metadata) -> bool {
         metadata.level() <= MAX_LOG_LEVEL
     }
 
-    fn log(&self, record: &LogRecord) {
+    fn log(&self, record: &Record) {
         println!("{}: {}", record.level(), record.args());
     }
+
+    fn flush(&self) {}
 }
 
 static LOGGER: Logger = Logger;
 
 pub fn init() {
-    let _ = unsafe {
-        log::set_logger_raw(|max_lvl| {
-            max_lvl.set(MAX_LOG_LEVEL);
-            &LOGGER
-        })
-    };
+    let _ = unsafe { log::set_logger_racy(&LOGGER) };
 }

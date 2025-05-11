@@ -11,23 +11,15 @@
 //!
 //! See the `Multipart` struct for more info.
 
-pub extern crate buf_redux;
-extern crate httparse;
-extern crate twoway;
-
 use std::borrow::Borrow;
-use std::io::prelude::*;
 use std::io;
+use std::io::prelude::*;
+
+use log::{debug, info};
 
 use self::boundary::BoundaryReader;
-
 use self::field::PrivReadEntry;
-
-pub use self::field::{FieldHeaders, MultipartField, MultipartData, ReadEntry, ReadEntryResult};
-
-use self::save::SaveBuilder;
-
-pub use self::save::{Entries, SaveResult, SavedField};
+pub use self::field::{FieldHeaders, MultipartData, MultipartField, ReadEntry, ReadEntryResult};
 
 macro_rules! try_opt (
     ($expr:expr) => (
@@ -48,30 +40,19 @@ macro_rules! try_opt (
 );
 
 macro_rules! try_read_entry {
-    ($self_:expr; $try:expr) => (
+    ($self_:expr; $try:expr) => {
         match $try {
             Ok(res) => res,
-            Err(err) => return ::server::ReadEntryResult::Error($self_, err),
+            Err(err) => return crate::server::ReadEntryResult::Error($self_, err),
         }
-    )
+    };
 }
 
 mod boundary;
 mod field;
 
-#[cfg(feature = "hyper")]
-pub mod hyper;
-
-#[cfg(feature = "iron")]
-pub mod iron;
-
 #[cfg(feature = "tiny_http")]
 pub mod tiny_http;
-
-#[cfg(feature = "nickel")]
-pub mod nickel;
-
-pub mod save;
 
 /// The server-side implementation of `multipart/form-data` requests.
 ///
@@ -91,8 +72,8 @@ impl Multipart<()> {
             None => return Err(req),
         };
 
-        Ok(Multipart::with_body(req.body(), boundary))        
-    }   
+        Ok(Multipart::with_body(req.body(), boundary))
+    }
 }
 
 impl<R: Read> Multipart<R> {
@@ -110,7 +91,7 @@ impl<R: Read> Multipart<R> {
 
         info!("Multipart::with_boundary(_, {:?})", boundary);
 
-        Multipart { 
+        Multipart {
             reader: BoundaryReader::from_reader(body, boundary),
         }
     }
@@ -132,12 +113,15 @@ impl<R: Read> Multipart<R> {
     }
 
     /// Call `f` for each entry in the multipart request.
-    /// 
+    ///
     /// This is a substitute for Rust not supporting streaming iterators (where the return value
     /// from `next()` borrows the iterator for a bound lifetime).
     ///
     /// Returns `Ok(())` when all fields have been read, or the first error.
-    pub fn foreach_entry<F>(&mut self, mut foreach: F) -> io::Result<()> where F: FnMut(MultipartField<&mut Self>) {
+    pub fn foreach_entry<F>(&mut self, mut foreach: F) -> io::Result<()>
+    where
+        F: FnMut(MultipartField<&mut Self>),
+    {
         loop {
             match self.read_entry() {
                 Ok(Some(field)) => foreach(field),
@@ -145,13 +129,6 @@ impl<R: Read> Multipart<R> {
                 Err(err) => return Err(err),
             }
         }
-    }
-
-    /// Get a builder type for saving the files in this request to the filesystem.
-    ///
-    /// See [`SaveBuilder`](save/struct.SaveBuilder.html) for more information.
-    pub fn save(&mut self) -> SaveBuilder<&mut Self> {
-        SaveBuilder::new(self)
     }
 }
 
@@ -216,7 +193,9 @@ fn issue_104() {
     let request = Cursor::new(body);
 
     let mut multipart = Multipart::with_body(request, "boundary");
-    multipart.foreach_entry(|_field| {/* Do nothing */}).unwrap_err();
+    multipart
+        .foreach_entry(|_field| { /* Do nothing */ })
+        .unwrap_err();
 }
 
 #[test]
@@ -226,7 +205,9 @@ fn issue_114() {
     fn consume_all<R: BufRead>(mut rdr: R) {
         loop {
             let consume = rdr.fill_buf().unwrap().len();
-            if consume == 0 { return; }
+            if consume == 0 {
+                return;
+            }
             rdr.consume(consume);
         }
     }
@@ -249,42 +230,51 @@ fn issue_114() {
     let mut multipart = Multipart::with_body(request, "------------------------c616e5fded96a3c7");
 
     // one error if you do nothing
-    multipart.foreach_entry(|_entry| { /* do nothing */}).unwrap();
-
-    // a different error if you skip the first field
-    multipart.foreach_entry(|entry| if *entry.headers.name != *"key1" { consume_all(entry.data); })
+    multipart
+        .foreach_entry(|_entry| { /* do nothing */ })
         .unwrap();
 
+    // a different error if you skip the first field
+    multipart
+        .foreach_entry(|entry| {
+            if *entry.headers.name != *"key1" {
+                consume_all(entry.data);
+            }
+        })
+        .unwrap();
 
-    multipart.foreach_entry(|_entry| () /* match entry.headers.name.as_str() {
-        "file" => {
-            let mut vec = Vec::new();
-            entry.data.read_to_end(&mut vec).expect("can't read");
-            // message.file = String::from_utf8(vec).ok();
-            println!("key file got");
-        }
+    multipart
+        .foreach_entry(
+            |_entry| (), /* match entry.headers.name.as_str() {
+                             "file" => {
+                                 let mut vec = Vec::new();
+                                 entry.data.read_to_end(&mut vec).expect("can't read");
+                                 // message.file = String::from_utf8(vec).ok();
+                                 println!("key file got");
+                             }
 
-        "key1" => {
-            let mut vec = Vec::new();
-            entry.data.read_to_end(&mut vec).expect("can't read");
-            // message.key1 = String::from_utf8(vec).ok();
-            println!("key1 got");
-        }
+                             "key1" => {
+                                 let mut vec = Vec::new();
+                                 entry.data.read_to_end(&mut vec).expect("can't read");
+                                 // message.key1 = String::from_utf8(vec).ok();
+                                 println!("key1 got");
+                             }
 
-        "key2" => {
-            let mut vec = Vec::new();
-            entry.data.read_to_end(&mut vec).expect("can't read");
-            // message.key2 = String::from_utf8(vec).ok();
-            println!("key2 got");
-        }
+                             "key2" => {
+                                 let mut vec = Vec::new();
+                                 entry.data.read_to_end(&mut vec).expect("can't read");
+                                 // message.key2 = String::from_utf8(vec).ok();
+                                 println!("key2 got");
+                             }
 
-        _ => {
-            // as multipart has a bug https://github.com/abonander/multipart/issues/114
-            // we manually do read_to_end here
-            //let mut _vec = Vec::new();
-            //entry.data.read_to_end(&mut _vec).expect("can't read");
-            println!("key neglected");
-        }
-    }*/)
-    .expect("Unable to iterate multipart?")
+                             _ => {
+                                 // as multipart has a bug https://github.com/abonander/multipart/issues/114
+                                 // we manually do read_to_end here
+                                 //let mut _vec = Vec::new();
+                                 //entry.data.read_to_end(&mut _vec).expect("can't read");
+                                 println!("key neglected");
+                             }
+                         }*/
+        )
+        .expect("Unable to iterate multipart?")
 }

@@ -36,43 +36,10 @@
 //! I have opened an issue as a place to collect responses and discussions for these questions
 //! [on Github](https://github.com/abonander/multipart/issues/96). Please quote the RFC-statement
 //! (and/or link to its source line) and provide your feedback there.
-#![cfg_attr(feature = "clippy", feature(plugin))]
-#![cfg_attr(feature = "clippy", plugin(clippy))]
-#![cfg_attr(feature = "clippy", deny(clippy))]
-#![cfg_attr(feature = "bench", feature(test))]
 #![deny(missing_docs)]
-
-#[macro_use]
-extern crate log;
-
-extern crate mime;
-extern crate mime_guess;
-extern crate rand;
-extern crate tempfile;
-
-#[cfg(feature = "quick-error")]
-#[macro_use]
-extern crate quick_error;
-
-#[cfg(feature = "server")]
-extern crate safemem;
-
-#[cfg(feature = "hyper")]
-extern crate hyper;
-
-#[cfg(feature = "iron")]
-extern crate iron;
-
-#[cfg(feature = "tiny_http")]
-extern crate tiny_http;
-
-#[cfg(test)]
-extern crate env_logger;
 
 #[cfg(any(feature = "mock", test))]
 pub mod mock;
-
-use rand::Rng;
 
 /// Chain a series of results together, with or without previous results.
 ///
@@ -109,21 +76,11 @@ macro_rules! chain_result {
     );
 }
 
-#[cfg(feature = "client")]
-pub mod client;
 #[cfg(feature = "server")]
 pub mod server;
 
-#[cfg(all(test, feature = "client", feature = "server"))]
+#[cfg(all(test, feature = "server"))]
 mod local_test;
-
-fn random_alphanumeric(len: usize) -> String {
-    rand::thread_rng()
-        .sample_iter(&rand::distributions::Alphanumeric)
-        .take(len)
-        .map(|c| c as char)
-        .collect()
-}
 
 #[cfg(test)]
 fn init_log() {

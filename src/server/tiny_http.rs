@@ -16,18 +16,29 @@ impl<'r> HttpRequest for &'r mut TinyHttpRequest {
     fn multipart_boundary(&self) -> Option<&str> {
         const BOUNDARY: &str = "boundary=";
 
-        let content_type = try_opt!(self
+        let content_type = self
             .headers()
             .iter()
-            .find(|header| header.field.equiv("Content-Type")))
-        .value
-        .as_str();
-        let start = try_opt!(content_type.find(BOUNDARY)) + BOUNDARY.len();
-        let end = content_type[start..]
-            .find(';')
-            .map_or(content_type.len(), |end| start + end);
+            .find(|header| header.field.equiv("Content-Type"))?
+            .value
+            .as_str();
 
-        Some(&content_type[start..end])
+        // Extract the boundary value from the header.
+        let boundary_value = content_type.find(BOUNDARY).map(|pos| {
+            let after_boundary = &content_type[pos + BOUNDARY.len()..];
+            match after_boundary.split_once(';') {
+                Some((value, _)) => value,
+                None => after_boundary,
+            }
+        })?;
+
+        // Trim surrounding double quotes if present.
+        let boundary = boundary_value
+            .strip_prefix('"')
+            .and_then(|s| s.strip_suffix('"'))
+            .unwrap_or(boundary_value);
+
+        Some(&boundary)
     }
 
     fn body(self) -> Self::Body {

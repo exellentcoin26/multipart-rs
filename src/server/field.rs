@@ -5,20 +5,17 @@
 // http://opensource.org/licenses/MIT>, at your option. This file may not be
 // copied, modified, or distributed except according to those terms.
 
-//! `multipart` field header parsing.
-use mime::Mime;
-
 use std::error::Error;
 use std::io::{self, BufRead, Read};
+use std::sync::Arc;
 use std::{fmt, str};
 
-use std::sync::Arc;
-
-use super::httparse::{self, Error as HttparseError, Header, Status, EMPTY_HEADER};
+use httparse::{Error as HttparseError, Header, Status, EMPTY_HEADER};
+use log::{debug, info};
+use mime::Mime;
+use quick_error::quick_error;
 
 use self::ReadEntryResult::*;
-
-use super::save::SaveBuilder;
 
 const EMPTY_STR_HEADER: StrHeader<'static> = StrHeader { name: "", val: "" };
 
@@ -276,7 +273,7 @@ impl<M: ReadEntry> MultipartField<M> {
 
 /// The data of a field in a `multipart/form-data` request.
 ///
-/// You can read it to EOF, or use the `save()` adaptor to save it to disk/memory.
+/// You can read it to EOF.
 #[derive(Debug)]
 pub struct MultipartData<M> {
     inner: Option<M>,
@@ -292,11 +289,6 @@ impl<M> MultipartData<M>
 where
     M: ReadEntry,
 {
-    /// Get a builder type which can save the field with or without a size limit.
-    pub fn save(&mut self) -> SaveBuilder<&mut Self> {
-        SaveBuilder::new(self)
-    }
-
     /// Take the inner `Multipart` or `&mut Multipart`
     pub fn into_inner(self) -> M {
         self.inner.expect(DATA_INNER_ERR)
