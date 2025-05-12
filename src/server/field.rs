@@ -129,13 +129,25 @@ impl FieldHeaders {
     }
 
     fn parse(headers: &[StrHeader]) -> Result<FieldHeaders, ParseHeaderError> {
-        let cont_disp = ContentDisp::parse_required(headers)?;
+        // Taken from the following fork of the orignal project.
+        // https://github.com/kkazuo/multipart-any/commit/fa8c960afd473631b496f14f58bb1b38f72e8ab2
 
-        Ok(FieldHeaders {
-            name: cont_disp.field_name.into(),
-            filename: cont_disp.filename,
-            content_type: parse_content_type(headers)?,
-        })
+        // Does not require `Content-Disposition` header in FieldHearders.
+        // So, you can parse any `multipart/*` body.
+
+        match ContentDisp::parse_required(headers) {
+            Ok(cont_disp) => Ok(FieldHeaders {
+                name: cont_disp.field_name.into(),
+                filename: cont_disp.filename,
+                content_type: parse_content_type(headers)?,
+            }),
+
+            Err(_) => Ok(FieldHeaders {
+                name: "".into(),
+                filename: None,
+                content_type: parse_content_type(headers)?,
+            }),
+        }
     }
 }
 
