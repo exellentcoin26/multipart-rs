@@ -12,7 +12,7 @@ use std::cmp;
 use std::io;
 use std::io::prelude::*;
 
-use buf_redux::{policy::MinBuffered, BufReader};
+use buffer_redux::{policy::MinBuffered, BufReader};
 use log::{debug, trace};
 
 use self::State::*;
