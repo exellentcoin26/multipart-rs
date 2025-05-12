@@ -13,7 +13,7 @@ log = "0.4"
 mime = "0.3.14"
 rand = "0.8"
 safemem = { version = "0.3", optional = true }
-quick-error = "1.2.2"
+quick-error = "2.0"
 
 #Server Dependencies
 buf_redux = { version = "0.8", optional = true, default-features = false }

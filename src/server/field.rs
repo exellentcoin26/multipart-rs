@@ -5,7 +5,6 @@
 // http://opensource.org/licenses/MIT>, at your option. This file may not be
 // copied, modified, or distributed except according to those terms.
 
-use std::error::Error;
 use std::io::{self, BufRead, Read};
 use std::sync::Arc;
 use std::{fmt, str};
@@ -24,7 +23,7 @@ macro_rules! invalid_cont_disp {
         return Err(ParseHeaderError::InvalidContDisp(
             $reason,
             $cause.to_string(),
-        ));
+        ))
     };
 }
 
@@ -530,32 +529,27 @@ quick_error! {
     enum ParseHeaderError {
         /// The `Content-Disposition` header was not found
         MissingContentDisposition(headers: String) {
-            display(x) -> ("{}:\n{}", x.description(), headers)
-            description("\"Content-Disposition\" header not found in field headers")
+            display(x) -> ("\"Content-Disposition\" header not found in field headers:\n{}", headers)
         }
         InvalidContDisp(reason: &'static str, cause: String) {
-            display(x) -> ("{}: {}: {}", x.description(), reason, cause)
-            description("invalid \"Content-Disposition\" header")
+            display(x) -> ("invalid \"Content-Disposition\" header: {}: {}", reason, cause)
         }
         /// The header was found but could not be parsed
         TokenizeError(err: HttparseError) {
-            description(GENERIC_PARSE_ERR)
-            display(x) -> ("{}: {}", x.description(), err)
-            cause(err)
+            display(x) -> ("{}: {}", GENERIC_PARSE_ERR, err)
+            source(err)
             from()
         }
         MimeError(cont_type: String) {
-            description("Failed to parse Content-Type")
-            display(this) -> ("{}: {}", this.description(), cont_type)
+            display(this) -> ("Failed to parse Content-Type: {}", cont_type)
         }
         TooLarge {
-            description("field headers section ridiculously long or missing trailing CRLF-CRLF")
+            display("field headers section ridiculously long or missing trailing CRLF-CRLF")
         }
         /// IO error
         Io(err: io::Error) {
-            description("an io error occurred while parsing the headers")
-            display(x) -> ("{}: {}", x.description(), err)
-            cause(err)
+            display(x) -> ("an io error occurred while parsing the headers: {}", err)
+            source(err)
             from()
         }
     }
